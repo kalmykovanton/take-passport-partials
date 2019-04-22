@@ -1,6 +1,7 @@
 {
   "name": "take-photo-from-documents",
   "version": "0.1.0",
+  "homepage": "https://kalmykovanton.github.io/take-passport-partials/",
   "private": true,
   "dependencies": {
     "react": "^16.8.6",
