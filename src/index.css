@@ -33,23 +33,6 @@ body {
   justify-content: center;
 }
 
-.app-title {
-  position: absolute;
-  top: 20px;
-  margin: 0;
-  text-align: center;
-  color: lightgray;
-  z-index: 10;
-}
-
-.announcement {
-  position: absolute;
-  margin: 0;
-  font-size: 30px;
-  color: lightgray;
-  z-index: 10;
-}
-
 .images-wrapper {
   display: flex;
   flex-wrap: wrap;
@@ -68,14 +51,8 @@ body {
   margin-top: 10px;
 }
 
-.overlay {
-  position: absolute;
-  height: 100%;
-  width: 100%;
-  z-index: 5;
-}
-
-.canvas-overlay {
+.canvas-passport-frame-overlay,
+.canvas-partial-frame-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -100,24 +77,6 @@ body {
   margin: -25px 0 0 -15px !important;
 }
 
-.resize-button {
-  position: absolute;
-  width: 0px;
-  height: 0px;
-  padding: 0;
-  border-style: solid;
-  background: transparent;
-  outline: none;
-  visibility: hidden;
-  z-index: 5;
-}
-
-.resize-button--wide {
-  border-width: 0 32px 32px 0;
-  border-color: transparent #fff transparent transparent;
-}
-
-.resize-button--small {
-  border-width: 32px 0 0 32px;
-  border-color: transparent transparent transparent #fff;
+#container-circles {
+  z-index: 10;
 }

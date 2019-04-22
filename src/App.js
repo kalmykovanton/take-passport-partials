@@ -1,85 +1,113 @@
 import React, { Component } from "react";
+import axios from "axios";
 
 import AppCamera from "./AppCamera";
 import AppButton from "./AppButton";
 import AppImage from "./AppImage";
 
-const SMALL_RECT_STATUS_NAME = "small";
-const WIDE_RECT_STATUS_NAME = "wide";
-const SMALL_HEIGHT_MULTER = 0.3;
-const WIDE_HEIGHT_MULTER = 0.5;
-const WEIGHT_MULTER = 0.8;
-const RESIZE_BUTTON_SIZE = 32;
-
 class App extends Component {
   state = {
     croppedPhoto: "",
+    croppedBarCode: "",
     timestamp: "",
     videoRef: null,
-    rectWidth: 0,
-    rectHeight: 0,
-    rectX: 0,
-    rectY: 0,
-    rectHeightMulter: WIDE_HEIGHT_MULTER,
-    rectWidthMulter: WEIGHT_MULTER,
-    rectStatus: WIDE_RECT_STATUS_NAME
+    photoRectW: 0,
+    photoRectH: 0,
+    photoRectX: 0,
+    photoRectY: 0,
+    barCodeRectW: 0,
+    barCodeRectH: 0,
+    barCodeRectX: 0,
+    barCodeRectY: 0
   };
 
-  initCamera = () => {
-    const { rectHeightMulter, rectWidthMulter, rectStatus } = this.state;
-    const resizeButton = document.getElementById("resize-button");
-    const video = document.querySelector("video");
-    video.setAttribute("width", 768); //todo: REMOVE!!!
-    video.setAttribute("height", 576); //todo: REMOVE!!!
-    const videoOffsetWidth = video.offsetWidth;
-    const videoOffsetHeight = video.offsetHeight;
+  componentDidMount() {
+    window.addEventListener("resize", this.initCamera);
+  }
 
-    // const rate = 2.5 / 3;
-    const rectHeight = videoOffsetHeight * rectHeightMulter;
-    const rectWidth = rectHeight * rectWidthMulter;
-    const rectX = (videoOffsetWidth - rectWidth) / 2;
-    const rectY = (videoOffsetHeight - rectHeight) / 2;
-    const smallResizeButtonTop =
-      window.innerHeight / 2 - rectHeight / 2 - RESIZE_BUTTON_SIZE / 2;
-    const smallResizeButtonLeft =
-      window.innerWidth / 2 + rectWidth / 2 - RESIZE_BUTTON_SIZE / 2;
-    const largeResizeButtonTop =
-      window.innerHeight / 2 - rectHeight / 2 - RESIZE_BUTTON_SIZE;
-    const largeResizeButtonLeft = window.innerWidth / 2 + rectWidth / 2;
+  sendToS3 = (data, name) => {
+    axios
+      .post(process.env.REACT_APP_BE_PATH_TO_UPLOAD, {
+        photo: data,
+        name
+      })
+      .then(r => r)
+      .catch(e => console.error("UPLOAD ERROR => ", e));
+  };
 
-    resizeButton.setAttribute(
-      "style",
-      `top: ${
-        rectStatus === SMALL_RECT_STATUS_NAME
-          ? smallResizeButtonTop
-          : largeResizeButtonTop
-      }px;
-      left: ${
-        rectStatus === SMALL_RECT_STATUS_NAME
-          ? smallResizeButtonLeft
-          : largeResizeButtonLeft
-      }px;
-      visibility: visible`
-    );
-
-    const canvasOverlay = document.getElementById("canvas-overlay");
-    canvasOverlay.width = videoOffsetWidth;
-    canvasOverlay.height = videoOffsetHeight;
+  createPartialFrameOverlay = ({
+    selector,
+    videoW,
+    videoH,
+    rectW,
+    rectH,
+    x,
+    y
+  }) => {
+    const canvasOverlay = document.getElementById(selector);
+    canvasOverlay.width = videoW;
+    canvasOverlay.height = videoH;
     const ctx = canvasOverlay.getContext("2d");
     ctx.lineWidth = 1;
     ctx.strokeStyle = "#fff";
-    ctx.strokeRect(rectX, rectY, rectWidth, rectHeight);
+    ctx.strokeRect(x, y, rectW, rectH);
+  };
+
+  initCamera = () => {
+    const video = document.querySelector("video");
+
+    if (!video) return;
+
+    const videoW = video.offsetWidth;
+    const videoH = video.offsetHeight;
+    const isLandscapeMode = video.offsetWidth > video.offsetHeight;
+
+    const photoRectH = isLandscapeMode ? videoH * 0.34 : videoH * 0.2;
+    const photoRectW = isLandscapeMode ? videoW * 0.2 : videoW * 0.34;
+    const photoRectX = isLandscapeMode ? videoW * 0.07 : videoW * 0.35;
+    const photoRectY = isLandscapeMode ? videoH * 0.3 : videoH * 0.065;
+
+    const barCodeRectH = isLandscapeMode ? videoH * 0.16 : videoH * 0.94;
+    const barCodeRectW = isLandscapeMode ? videoW * 0.94 : videoW * 0.16;
+    const barCodeRectX = isLandscapeMode
+      ? (videoW - barCodeRectW) / 2
+      : videoW * 0.055;
+    const barCodeRectY = isLandscapeMode
+      ? videoH * 0.78
+      : (videoH - barCodeRectH) / 2;
+
+    this.createPartialFrameOverlay({
+      selector: "canvas-photo-frame-overlay",
+      videoW,
+      videoH,
+      rectW: photoRectW,
+      rectH: photoRectH,
+      x: photoRectX,
+      y: photoRectY
+    });
+
+    this.createPartialFrameOverlay({
+      selector: "canvas-bar-code-frame-overlay",
+      videoW,
+      videoH,
+      rectW: barCodeRectW,
+      rectH: barCodeRectH,
+      x: barCodeRectX,
+      y: barCodeRectY
+    });
 
     this.setState({
       videoRef: video,
-      rectWidth,
-      rectHeight,
-      rectX,
-      rectY
+      photoRectW,
+      photoRectH,
+      photoRectX,
+      photoRectY,
+      barCodeRectW,
+      barCodeRectH,
+      barCodeRectX,
+      barCodeRectY
     });
   };
-
-  onCameraStart = setTimeout(this.initCamera, 3000);
 
   cropImage = (img, newWidth, newHeight, startX, startY) => {
     const tnCanvas = document.createElement("canvas");
@@ -108,8 +136,20 @@ class App extends Component {
     return tnCanvas.toDataURL();
   };
 
+  onCameraStart = setTimeout(this.initCamera, 2000);
+
   onTakePhoto = dataUri => {
-    const { videoRef, rectWidth, rectHeight, rectX, rectY } = this.state;
+    const {
+      videoRef,
+      photoRectW,
+      photoRectH,
+      photoRectX,
+      photoRectY,
+      barCodeRectW,
+      barCodeRectH,
+      barCodeRectX,
+      barCodeRectY
+    } = this.state;
 
     const img = new Image();
     img.src = dataUri;
@@ -118,12 +158,24 @@ class App extends Component {
     img.onload = () => {
       const croppedPhoto = this.cropImage(
         img,
-        rectWidth,
-        rectHeight,
-        rectX,
-        rectY
+        photoRectW,
+        photoRectH,
+        photoRectX,
+        photoRectY
       );
-      this.setState({ croppedPhoto: croppedPhoto, timestamp: Date.now() });
+      const croppedBarCode = this.cropImage(
+        img,
+        barCodeRectW,
+        barCodeRectH,
+        barCodeRectX,
+        barCodeRectY
+      );
+
+      const timestamp = Date.now();
+
+      this.setState({ croppedPhoto, croppedBarCode, timestamp });
+      this.sendToS3(dataUri, `passport_photo_${timestamp}`);
+      this.sendToS3(dataUri, `passport_bar_code_${timestamp}`);
     };
   };
 
@@ -132,38 +184,13 @@ class App extends Component {
     newWindow.document.write(`<img src="${data}">`);
   };
 
-  resizeFrame = () => {
-    this.setState(
-      ({ rectStatus }) => ({
-        rectHeightMulter:
-          rectStatus === SMALL_RECT_STATUS_NAME
-            ? WIDE_HEIGHT_MULTER
-            : SMALL_HEIGHT_MULTER,
-        rectStatus:
-          rectStatus === SMALL_RECT_STATUS_NAME
-            ? WIDE_RECT_STATUS_NAME
-            : SMALL_RECT_STATUS_NAME
-      }),
-      this.initCamera
-    );
-  };
-
   render() {
-    const { croppedPhoto, timestamp, rectStatus } = this.state;
+    const { croppedPhoto, croppedBarCode, timestamp } = this.state;
+    const canShowCamera = !croppedPhoto && !croppedBarCode;
 
     return (
       <div className="app">
-        <h1 className="app-title">Take Photo From Document</h1>
-        <button
-          id="resize-button"
-          className={`resize-button ${
-            rectStatus === SMALL_RECT_STATUS_NAME
-              ? "resize-button--wide"
-              : "resize-button--small"
-          }`}
-          onClick={this.resizeFrame}
-        />
-        {!croppedPhoto && (
+        {canShowCamera && (
           <AppCamera
             onTakePhoto={this.onTakePhoto}
             onCameraStart={this.onCameraStart}
@@ -178,8 +205,13 @@ class App extends Component {
               >
                 <AppImage src={croppedPhoto} />
                 <AppButton
-                  title={`cropped_${timestamp}`}
+                  title={`passport_photo_${timestamp}`}
                   onClick={this.openInNewTab(croppedPhoto)}
+                />
+                <AppImage src={croppedBarCode} />
+                <AppButton
+                  title={`passport_bar_code_${timestamp}`}
+                  onClick={this.openInNewTab(croppedBarCode)}
                 />
               </div>
             </div>
