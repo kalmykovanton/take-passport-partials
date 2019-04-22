@@ -1,1 +1,1 @@
-[Deploy Link](https://kalmykovanton.github.io/next-photo/)
+[Deploy Link](https://kalmykovanton.github.io/take-passport-partials/)
