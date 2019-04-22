@@ -1,6 +1,7 @@
 {
   "name": "take-passport-partials",
   "version": "0.1.0",
+  "homepage": "https://kalmykovanton.github.io/take-passport-partials/",
   "private": true,
   "dependencies": {
     "axios": "0.18.0",
