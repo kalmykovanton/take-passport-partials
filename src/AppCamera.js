@@ -1,8 +1,7 @@
 import React from "react";
-import Camera, { FACING_MODES } from "react-html5-camera-photo";
-import "react-html5-camera-photo/build/css/index.css";
+import Camera from "./Camera.js";
 
-const AppCamera = ({ onTakePhoto, onCameraStart }) => (
+const AppCamera = ({ onTakePhoto, onCameraStart, videoHeight, videoWidth}) => (
   <div>
     <canvas
       className="canvas-partial-frame-overlay"
@@ -13,9 +12,10 @@ const AppCamera = ({ onTakePhoto, onCameraStart }) => (
       id="canvas-bar-code-frame-overlay"
     />
     <Camera
+      videoHeight={videoHeight}
+      videoWidth={videoWidth}
       onTakePhoto={onTakePhoto}
       onCameraStart={onCameraStart}
-      idealFacingMode={FACING_MODES.ENVIRONMENT}
       isImageMirror={false}
     />
   </div>

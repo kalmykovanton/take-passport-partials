@@ -7,10 +7,10 @@ import AppImage from "./AppImage";
 
 class App extends Component {
   state = {
+    passportAspectRatio: 1.414634146,
     croppedPhoto: "",
     croppedBarCode: "",
     timestamp: "",
-    videoRef: null,
     photoRectW: 0,
     photoRectH: 0,
     photoRectX: 0,
@@ -22,6 +22,7 @@ class App extends Component {
   };
 
   componentDidMount() {
+    this.videoRef = document.querySelector("video");
     window.addEventListener("resize", this.initCamera);
   }
 
@@ -53,28 +54,77 @@ class App extends Component {
     ctx.strokeRect(x, y, rectW, rectH);
   };
 
+  getViewPortInfo = () => {
+    const viewPortWidth = Math.max(document.documentElement.clientWidth, window.innerWidth || 0);
+    const viewPortHeight = Math.max(document.documentElement.clientHeight, window.innerHeight || 0);
+    const viewPortAspectRatio = viewPortWidth / viewPortHeight || 0;
+
+    const isLandscapeMode = viewPortWidth > viewPortHeight;
+
+    return {
+      viewPortWidth,
+      viewPortHeight,
+      viewPortAspectRatio,
+      isLandscapeMode,
+    }
+  };
+
+  getOptimalVideoDimensions = () => {
+    const {viewPortHeight, viewPortWidth, viewPortAspectRatio} = this.getViewPortInfo();
+    const {passportAspectRatio} = this.state;
+
+    if (viewPortAspectRatio > passportAspectRatio) {
+      return {
+        height: viewPortHeight,
+        width: Math.floor(viewPortHeight * passportAspectRatio),
+      };
+    } else {
+      return {
+        width: viewPortWidth,
+        height: Math.floor(viewPortWidth / passportAspectRatio),
+      };
+    }
+  };
+
   initCamera = () => {
-    const video = document.querySelector("video");
+    if (!this.videoRef) return;
 
-    if (!video) return;
+    if (this.state.croppedPhoto || this.state.croppedBarCode) return;
 
-    const videoW = video.offsetWidth;
-    const videoH = video.offsetHeight;
-    const isLandscapeMode = video.offsetWidth > video.offsetHeight;
+    const {height: videoH, width: videoW} = this.getOptimalVideoDimensions();
 
-    const photoRectH = isLandscapeMode ? videoH * 0.34 : videoH * 0.2;
-    const photoRectW = isLandscapeMode ? videoW * 0.2 : videoW * 0.34;
-    const photoRectX = isLandscapeMode ? videoW * 0.07 : videoW * 0.35;
-    const photoRectY = isLandscapeMode ? videoH * 0.3 : videoH * 0.065;
+    let photoRectH;
+    let photoRectW;
+    let photoRectX;
+    let photoRectY;
+    let barCodeRectH;
+    let barCodeRectW;
+    let barCodeRectX;
+    let barCodeRectY;
 
-    const barCodeRectH = isLandscapeMode ? videoH * 0.16 : videoH * 0.94;
-    const barCodeRectW = isLandscapeMode ? videoW * 0.94 : videoW * 0.16;
-    const barCodeRectX = isLandscapeMode
-      ? (videoW - barCodeRectW) / 2
-      : videoW * 0.055;
-    const barCodeRectY = isLandscapeMode
-      ? videoH * 0.78
-      : (videoH - barCodeRectH) / 2;
+    // if (isLandscapeMode) {
+    barCodeRectH = videoH * 0.16;
+    barCodeRectW = videoW * 0.94;
+
+    barCodeRectX = (videoW - barCodeRectW) / 2;
+    barCodeRectY = videoH * 0.78;
+
+    photoRectH = videoH * 0.49;
+    photoRectW = videoW * 0.27;
+
+    photoRectX = barCodeRectX;
+    photoRectY = videoH * 0.25;
+    // } else {
+    //   photoRectH = videoH * 0.2;
+    //   photoRectW = videoW * 0.34;
+    //   photoRectX = videoW * 0.35;
+    //   photoRectY = videoH * 0.065;
+    //
+    //   barCodeRectH = videoH * 0.94;
+    //   barCodeRectW = videoW * 0.16;
+    //   barCodeRectX = videoW * 0.055;
+    //   barCodeRectY = (videoH - barCodeRectH) / 2;
+    // }
 
     this.createPartialFrameOverlay({
       selector: "canvas-photo-frame-overlay",
@@ -97,7 +147,6 @@ class App extends Component {
     });
 
     this.setState({
-      videoRef: video,
       photoRectW,
       photoRectH,
       photoRectX,
@@ -105,11 +154,13 @@ class App extends Component {
       barCodeRectW,
       barCodeRectH,
       barCodeRectX,
-      barCodeRectY
+      barCodeRectY,
+      videoW,
+      videoH,
     });
   };
 
-  cropImage = (img, newWidth, newHeight, startX, startY) => {
+  cropImage = (img, newWidth, newHeight, startX, startY, height, width) => {
     const tnCanvas = document.createElement("canvas");
     const tnCanvasContext = tnCanvas.getContext("2d");
     tnCanvas.width = newWidth;
@@ -117,9 +168,10 @@ class App extends Component {
 
     const bufferCanvas = document.createElement("canvas");
     const bufferContext = bufferCanvas.getContext("2d");
-    bufferCanvas.width = img.width;
-    bufferCanvas.height = img.height;
-    bufferContext.drawImage(img, 0, 0, img.width, img.height);
+
+    bufferCanvas.width = width;
+    bufferCanvas.height = height;
+    bufferContext.drawImage(img, 0, 0, width, height);
 
     tnCanvasContext.drawImage(
       bufferCanvas,
@@ -138,9 +190,35 @@ class App extends Component {
 
   onCameraStart = setTimeout(this.initCamera, 2000);
 
+  getRenderedSize = (cWidth, cHeight, width, height, pos) => {
+    var oRatio = width / height,
+      cRatio = cWidth / cHeight;
+    return function() {
+      if (oRatio < cRatio) {
+        this.width = cWidth;
+        this.height = cWidth / oRatio;
+      } else {
+        this.width = cHeight * oRatio;
+        this.height = cHeight;
+      }
+      this.left = (cWidth - this.width)*(pos/100);
+      this.right = this.width + this.left;
+      return this;
+    }.call({});
+  };
+
+  getImgSizeInfo = (img) => {
+    return this.getRenderedSize(
+      img.width,
+      img.height,
+      img.naturalWidth,
+      img.naturalHeight,
+      50,
+    )
+  };
+
   onTakePhoto = dataUri => {
     const {
-      videoRef,
       photoRectW,
       photoRectH,
       photoRectX,
@@ -148,34 +226,43 @@ class App extends Component {
       barCodeRectW,
       barCodeRectH,
       barCodeRectX,
-      barCodeRectY
+      barCodeRectY,
+      videoH,
+      videoW,
     } = this.state;
 
     const img = new Image();
+    img.style.objectFit = 'cover';
     img.src = dataUri;
-    img.width = videoRef.offsetWidth;
-    img.height = videoRef.offsetHeight;
-    img.onload = () => {
+    img.width = videoW;
+    img.height = videoH;
+    img.onload = (e) => {
+      const {height, width, left } = this.getImgSizeInfo(e.target);
+
       const croppedPhoto = this.cropImage(
-        img,
+        e.target,
         photoRectW,
         photoRectH,
-        photoRectX,
-        photoRectY
+        photoRectX + Math.abs(left),
+        photoRectY,
+        height,
+        width
       );
       const croppedBarCode = this.cropImage(
-        img,
+        e.target,
         barCodeRectW,
         barCodeRectH,
-        barCodeRectX,
-        barCodeRectY
+        barCodeRectX + Math.abs(left),
+        barCodeRectY,
+        height,
+        width
       );
 
       const timestamp = Date.now();
 
-      this.setState({ croppedPhoto, croppedBarCode, timestamp });
-      this.sendToS3(dataUri, `passport_photo_${timestamp}`);
-      this.sendToS3(dataUri, `passport_bar_code_${timestamp}`);
+      this.setState({croppedPhoto, croppedBarCode, timestamp});
+      this.sendToS3(croppedPhoto, `passport_photo_${timestamp}`);
+      this.sendToS3(croppedBarCode, `passport_bar_code_${timestamp}`);
     };
   };
 
@@ -185,8 +272,16 @@ class App extends Component {
   };
 
   render() {
-    const { croppedPhoto, croppedBarCode, timestamp } = this.state;
+    const {croppedPhoto, croppedBarCode, timestamp, videoW, videoH, dataUri} = this.state;
     const canShowCamera = !croppedPhoto && !croppedBarCode;
+
+    if (dataUri) {
+      return (
+        <div className="app">
+          <img src={dataUri} width={videoW} alt=""/>
+        </div>
+      )
+    }
 
     return (
       <div className="app">
@@ -194,6 +289,8 @@ class App extends Component {
           <AppCamera
             onTakePhoto={this.onTakePhoto}
             onCameraStart={this.onCameraStart}
+            videoHeight={videoH}
+            videoWidth={videoW}
           />
         )}
         {croppedPhoto && (
