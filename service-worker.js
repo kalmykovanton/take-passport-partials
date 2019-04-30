@@ -14,7 +14,7 @@
 importScripts("https://storage.googleapis.com/workbox-cdn/releases/3.6.3/workbox-sw.js");
 
 importScripts(
-  "/take-passport-partials/precache-manifest.79fed208f41d8a3dd0e3ace9ee2c759d.js"
+  "/take-passport-partials/precache-manifest.18ead8a3142abd6bec1919405de5833f.js"
 );
 
 workbox.clientsClaim();
